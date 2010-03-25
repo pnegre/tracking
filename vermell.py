@@ -52,8 +52,8 @@ def setup_camera_capture(device_num=0):
 def main():
 
 	# create windows 
-	#create_and_position_window('RGB_VideoFrame', 10+cam_width, 10)
-	create_and_position_window('red', 10, 10)
+	create_and_position_window('RGB_VideoFrame', 10+cam_width, 10)
+	#create_and_position_window('red', 10, 10)
 
 	capture = setup_camera_capture()
 
@@ -86,10 +86,43 @@ def main():
 		cv.cvErode(laser_img,laser_img) #,0,2)
 		cv.cvDilate(laser_img,laser_img)
 		
-		c_count, contours = cv.cvFindContours (laser_img, storage, cv.CV_CHAIN_APPROX_NONE)
+		c_count, contours = cv.cvFindContours (laser_img, 
+												storage,
+												cv.sizeof_CvContour,
+												cv.CV_RETR_LIST,
+												cv.CV_CHAIN_APPROX_NONE,
+												cv.cvPoint (0,0))
 		
-		#highgui.cvShowImage ('RGB_VideoFrame', frame)
-		highgui.cvShowImage ('red', laser_img)
+		if c_count:
+			for c in contours.hrange():
+				count = c.total;
+				if( count < 6 ):
+					continue;
+				PointArray = cv.cvCreateMat(1, count, cv.CV_32SC2)
+				PointArray2D32f= cv.cvCreateMat( 1, count, cv.CV_32FC2)
+				cv.cvCvtSeqToArray(c, PointArray, cv.cvSlice(0, cv.CV_WHOLE_SEQ_END_INDEX));
+				cv.cvConvert( PointArray, PointArray2D32f )
+				
+				box = cv.CvBox2D()
+				box = cv.cvFitEllipse2(PointArray2D32f);
+				#cv.cvDrawContours(frame, c, cv.CV_RGB(255,255,255), cv.CV_RGB(255,255,255),0,1,8,cv.cvPoint(0,0));
+		
+				center = cv.CvPoint()
+				size = cv.CvSize()
+				center.x = cv.cvRound(box.center.x);
+				center.y = cv.cvRound(box.center.y);
+				size.width = cv.cvRound(box.size.width*0.5);
+				size.height = cv.cvRound(box.size.height*0.5);
+				box.angle = -box.angle;
+				
+				# Draw ellipse.
+				cv.cvEllipse(frame, center, size,
+						box.angle, 0, 360,
+						cv.CV_RGB(0,0,255), 1, cv.CV_AA, 0);
+				
+				
+		highgui.cvShowImage ('RGB_VideoFrame', frame)
+		#highgui.cvShowImage ('red', laser_img)
 
 		# handle events
 		k = highgui.cvWaitKey (10)
