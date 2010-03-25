@@ -11,9 +11,16 @@ from opencv import highgui
 # definition of some constants
 cam_width = 640
 cam_height = 480
-
-
 #############################################################################
+
+r_img = cv.cvCreateImage (cv.cvSize (cam_width,cam_height), 8, 1)
+g_img = cv.cvCreateImage (cv.cvSize (cam_width,cam_height), 8, 1)
+b_img = cv.cvCreateImage (cv.cvSize (cam_width,cam_height), 8, 1)
+laser_img = cv.cvCreateImage (cv.cvSize (cam_width,cam_height), 8, 1)
+storage = cv.cvCreateMemStorage(0)
+capture = None
+
+
 
 def create_and_position_window(name, xpos, ypos):
 	''' a function to created a named widow (from name), 
@@ -34,6 +41,7 @@ def setup_camera_capture(device_num=0):
 		device = 0
 	print 'Using Camera device %d'%device
 
+	global capture
 	# no argument on the command line, try to use the camera
 	capture = highgui.cvCreateCameraCapture (device)
 
@@ -75,69 +83,40 @@ def returnEllipses(contours):
 	return ellipses
 
 
-# so, here is the main part of the program
-def main():
+def initCapture():
+	setup_camera_capture()
 
-	# create windows 
-	create_and_position_window('RGB_VideoFrame', 10+cam_width, 10)
-	#create_and_position_window('red', 10, 10)
+def getData():
+	frame = highgui.cvQueryFrame(capture)
+	if frame is None:
+		return None
 
-	capture = setup_camera_capture()
+	cv.cvSplit(frame, b_img, g_img, r_img, None)
+	cv.cvInRangeS(r_img, 150, 255, r_img)
+	cv.cvInRangeS(g_img, 0, 100, g_img)
+	cv.cvInRangeS(b_img, 0, 100, b_img)
 
-	# create images for the different channels
-	r_img = cv.cvCreateImage (cv.cvSize (cam_width,cam_height), 8, 1)
-	g_img = cv.cvCreateImage (cv.cvSize (cam_width,cam_height), 8, 1)
-	b_img = cv.cvCreateImage (cv.cvSize (cam_width,cam_height), 8, 1)
-	laser_img = cv.cvCreateImage (cv.cvSize (cam_width,cam_height), 8, 1)
-	cv.cvSetZero(r_img)
-	cv.cvSetZero(g_img)
-	cv.cvSetZero(b_img)
-	cv.cvSetZero(laser_img)
-	
-	storage = cv.cvCreateMemStorage(0)
-
-	while True: 
-		# 1. capture the current image
-		frame = highgui.cvQueryFrame (capture)
-		if frame is None:
-			# no image captured... end the processing
-			break
-
-		cv.cvSplit(frame, b_img, g_img, r_img, None)
-		cv.cvInRangeS(r_img, 150, 255, r_img)
-		cv.cvInRangeS(g_img, 0, 100, g_img)
-		cv.cvInRangeS(b_img, 0, 100, b_img)
-
-		cv.cvAnd(r_img, g_img, laser_img)
-		cv.cvAnd(laser_img, b_img, laser_img)
-		cv.cvErode(laser_img,laser_img) #,0,2)
-		cv.cvDilate(laser_img,laser_img)
+	cv.cvAnd(r_img, g_img, laser_img)
+	cv.cvAnd(laser_img, b_img, laser_img)
+	cv.cvErode(laser_img,laser_img) #,0,2)
+	cv.cvDilate(laser_img,laser_img)
 		
-		c_count, contours = cv.cvFindContours (laser_img, 
-												storage,
-												cv.sizeof_CvContour,
-												cv.CV_RETR_LIST,
-												cv.CV_CHAIN_APPROX_NONE,
-												cv.cvPoint (0,0))
+	c_count, contours = cv.cvFindContours (laser_img, 
+											storage,
+											cv.sizeof_CvContour,
+											cv.CV_RETR_LIST,
+											cv.CV_CHAIN_APPROX_NONE,
+											cv.cvPoint (0,0))
+	if c_count:
+		return returnEllipses(contours)
+	else:
+		return None
 		
-		if c_count:
-			ellipses = returnEllipses(contours)
-			for e in ellipses:
-				cv.cvEllipse(frame, e['center'], e['size'],
-						e['angle'], 0, 360,
-						cv.CV_RGB(0,0,255), 1, cv.CV_AA, 0);
-				
-				
-		highgui.cvShowImage ('RGB_VideoFrame', frame)
-		#highgui.cvShowImage ('red', laser_img)
+	#if c_count:
+		#ellipses = returnEllipses(contours)
+		#for e in ellipses:
+			#cv.cvEllipse(frame, e['center'], e['size'],
+					#e['angle'], 0, 360,
+					#cv.CV_RGB(0,0,255), 1, cv.CV_AA, 0);
+			
 
-		# handle events
-		k = highgui.cvWaitKey (10)
-
-		if k == '\x1b' or k == 'q':
-			# user has press the ESC key, so exit
-			break
-
-
-if __name__ == '__main__':
-	main()
